@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+import {
+  Mountain,
+  Mail,
+  ShieldCheck,
+  ArrowLeft
+} from 'lucide-react';
+
 import { API } from '../App';
 
 export default function OTPVerification({
@@ -6,16 +13,16 @@ export default function OTPVerification({
   onVerified,
   onBack
 }) {
-  const [otp, setOtp] =
-    useState('');
+  const [otp, setOtp] = useState('');
 
-  const [error, setError] =
-    useState('');
-
+  const [error, setError] = useState('');
   const [message, setMessage] =
     useState('');
 
   const [loading, setLoading] =
+    useState(false);
+
+  const [resending, setResending] =
     useState(false);
 
   const verify = async e => {
@@ -32,8 +39,7 @@ export default function OTPVerification({
           method: 'POST',
 
           headers: {
-            'Content-Type':
-              'application/json'
+            'Content-Type': 'application/json'
           },
 
           body: JSON.stringify({
@@ -43,8 +49,7 @@ export default function OTPVerification({
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -62,16 +67,19 @@ export default function OTPVerification({
       }, 800);
 
     } catch (err) {
-      setError(err.message);
+      setError(
+        err.message ||
+        'Unable to verify OTP'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-
   const resend = async () => {
     setError('');
     setMessage('');
+    setResending(true);
 
     try {
       const response = await fetch(
@@ -80,8 +88,7 @@ export default function OTPVerification({
           method: 'POST',
 
           headers: {
-            'Content-Type':
-              'application/json'
+            'Content-Type': 'application/json'
           },
 
           body: JSON.stringify({
@@ -90,8 +97,7 @@ export default function OTPVerification({
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -105,98 +111,233 @@ export default function OTPVerification({
       );
 
     } catch (err) {
-      setError(err.message);
+      setError(
+        err.message ||
+        'Unable to resend OTP'
+      );
+    } finally {
+      setResending(false);
     }
   };
-
 
   return (
     <div className="authPage">
 
-      <div className="authCard">
+      <div className="authBackground">
 
-        <div className="authLogo">
-          ✉️
+        <div className="authBrand">
+
+          <div className="authBrandLogo">
+            <Mountain size={30} />
+          </div>
+
+          <div>
+            <b>GiriDrishti AI</b>
+
+            <span>
+              Predict. Warn. Protect.
+            </span>
+          </div>
+
         </div>
 
-        <h1>
-          Verify Email
-        </h1>
+        <div className="authHero">
 
-        <p>
-          We sent a 6-digit OTP to
-        </p>
-
-        <strong>
-          {email}
-        </strong>
-
-        {error && (
-          <div className="authError">
-            {error}
+          <div className="authLiveBadge">
+            <span className="liveDot" />
+            Secure Account Verification
           </div>
-        )}
 
-        {message && (
-          <div className="authSuccess">
-            {message}
+          <h1>
+            One Step
+            <br />
+            <span>Closer to Safety</span>
+          </h1>
+
+          <p>
+            Verify your email address to
+            activate your GiriDrishti AI
+            monitoring account.
+          </p>
+
+          <div className="authVerifyInfo">
+
+            <ShieldCheck size={22} />
+
+            <div>
+              <b>Why verify your email?</b>
+
+              <span>
+                Important landslide alerts and
+                account notifications can be
+                delivered securely.
+              </span>
+            </div>
+
           </div>
-        )}
 
-        <form
-          onSubmit={verify}
-        >
+        </div>
 
-          <label>
-            Verification OTP
-          </label>
+        <div className="authFooter">
 
-          <input
-            className="otpInput"
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="000000"
-            value={otp}
-            onChange={e =>
-              setOtp(
-                e.target.value
-                  .replace(/\D/g, '')
-              )
-            }
-            required
-          />
+          <span>
+            GiriDrishti AI
+          </span>
+
+          <span>
+            Intelligent Landslide Risk Monitoring
+          </span>
+
+        </div>
+
+      </div>
+
+      <div className="authFormSide">
+
+        <div className="authCard">
+
+          <div className="authMobileBrand">
+
+            <div className="authLogo">
+              <Mountain size={27} />
+            </div>
+
+            <div>
+              <b>GiriDrishti AI</b>
+
+              <span>
+                Predict. Warn. Protect.
+              </span>
+            </div>
+
+          </div>
+
+          <div className="authHeading">
+
+            <div className="authIconCircle">
+              <Mail size={22} />
+            </div>
+
+            <div>
+
+              <h2>Verify Email</h2>
+
+              <p>
+                Enter the verification code
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="otpEmailBox">
+
+            <Mail size={18} />
+
+            <div>
+
+              <span>OTP sent to</span>
+
+              <strong>{email}</strong>
+
+            </div>
+
+          </div>
+
+          {error && (
+            <div className="authError">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="authSuccess">
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={verify}>
+
+            <div className="authField">
+
+              <label>Verification Code</label>
+
+              <input
+                className="otpInput"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                value={otp}
+                onChange={e =>
+                  setOtp(
+                    e.target.value
+                      .replace(/\D/g, '')
+                  )
+                }
+                required
+              />
+
+              <small className="otpHint">
+                Enter the 6-digit code
+                sent to your email
+              </small>
+
+            </div>
+
+            <button
+              type="submit"
+              className="primary authButton"
+              disabled={
+                loading ||
+                otp.length !== 6
+              }
+            >
+              {loading
+                ? 'Verifying...'
+                : 'Verify Email'}
+            </button>
+
+          </form>
 
           <button
-            type="submit"
-            className="primary authButton"
-            disabled={
-              loading ||
-              otp.length !== 6
-            }
+            type="button"
+            className="secondaryAuthButton"
+            onClick={resend}
+            disabled={resending}
           >
-            {loading
-              ? 'Verifying...'
-              : 'Verify OTP'}
+            {resending
+              ? 'Sending...'
+              : 'Resend OTP'}
           </button>
 
-        </form>
+          <div className="authDivider">
+            <span />
+            <small>SECURE VERIFICATION</small>
+            <span />
+          </div>
 
-        <button
-          type="button"
-          className="secondaryAuthButton"
-          onClick={resend}
-        >
-          Resend OTP
-        </button>
+          <button
+            type="button"
+            className="backButton"
+            onClick={onBack}
+          >
+            <ArrowLeft size={16} />
+            Back to Register
+          </button>
 
-        <button
-          type="button"
-          className="backButton"
-          onClick={onBack}
-        >
-          Back to Register
-        </button>
+          <div className="authSecurity">
+
+            <ShieldCheck size={16} />
+
+            <span>
+              OTP expires after 10 minutes
+            </span>
+
+          </div>
+
+        </div>
 
       </div>
 
