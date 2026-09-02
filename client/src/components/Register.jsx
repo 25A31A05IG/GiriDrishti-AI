@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
+import {
+  Mountain,
+  User,
+  Mail,
+  Lock,
+  ShieldCheck,
+  ArrowRight
+} from 'lucide-react';
+
 import { API } from '../App';
 
 export default function Register({
   onOTP,
   onLogin
 }) {
-  const [name, setName] =
-    useState('');
-
-  const [email, setEmail] =
-    useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
 
   const [password, setPassword] =
     useState('');
@@ -17,23 +23,19 @@ export default function Register({
   const [confirmPassword, setConfirmPassword] =
     useState('');
 
-  const [error, setError] =
-    useState('');
-
-  const [loading, setLoading] =
-    useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async e => {
     e.preventDefault();
 
     setError('');
 
-    if (
-      password !== confirmPassword
-    ) {
+    if (password !== confirmPassword) {
       setError(
         'Passwords do not match'
       );
+
       return;
     }
 
@@ -41,6 +43,7 @@ export default function Register({
       setError(
         'Password must be at least 6 characters'
       );
+
       return;
     }
 
@@ -53,8 +56,7 @@ export default function Register({
           method: 'POST',
 
           headers: {
-            'Content-Type':
-              'application/json'
+            'Content-Type': 'application/json'
           },
 
           body: JSON.stringify({
@@ -65,8 +67,7 @@ export default function Register({
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -78,7 +79,10 @@ export default function Register({
       onOTP(data.email);
 
     } catch (err) {
-      setError(err.message);
+      setError(
+        err.message ||
+        'Unable to create account'
+      );
     } finally {
       setLoading(false);
     }
@@ -87,114 +91,275 @@ export default function Register({
   return (
     <div className="authPage">
 
-      <div className="authCard">
+      <div className="authBackground">
 
-        <div className="authLogo">
-          🌄
+        <div className="authBrand">
+
+          <div className="authBrandLogo">
+            <Mountain size={30} />
+          </div>
+
+          <div>
+            <b>GiriDrishti AI</b>
+
+            <span>
+              Predict. Warn. Protect.
+            </span>
+          </div>
+
         </div>
 
-        <h1>
-          GiriDrishti AI
-        </h1>
+        <div className="authHero">
 
-        <p>
-          Create your monitoring account
-        </p>
-
-        <h2>
-          Register
-        </h2>
-
-        {error && (
-          <div className="authError">
-            {error}
+          <div className="authLiveBadge">
+            <span className="liveDot" />
+            Northeast India Risk Intelligence
           </div>
-        )}
 
-        <form
-          onSubmit={handleSubmit}
-        >
+          <h1>
+            Join the
+            <br />
+            <span>Safety Network</span>
+          </h1>
 
-          <label>
-            Full Name
-          </label>
+          <p>
+            Create your GiriDrishti account
+            to access AI-powered landslide
+            monitoring, alerts and citizen
+            reporting.
+          </p>
 
-          <input
-            type="text"
-            placeholder="Enter your name"
-            value={name}
-            onChange={e =>
-              setName(e.target.value)
-            }
-            required
-          />
+          <div className="authFeatures">
 
-          <label>
-            Email
-          </label>
+            <div className="authFeature">
 
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={e =>
-              setEmail(e.target.value)
-            }
-            required
-          />
+              <div className="authFeatureIcon">
+                <ShieldCheck size={18} />
+              </div>
 
-          <label>
-            Password
-          </label>
+              <div>
+                <b>Verified Access</b>
 
-          <input
-            type="password"
-            placeholder="Minimum 6 characters"
-            value={password}
-            onChange={e =>
-              setPassword(e.target.value)
-            }
-            required
-          />
+                <span>
+                  Email OTP protects your account
+                </span>
+              </div>
 
-          <label>
-            Confirm Password
-          </label>
+            </div>
 
-          <input
-            type="password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChange={e =>
-              setConfirmPassword(
-                e.target.value
-              )
-            }
-            required
-          />
+            <div className="authFeature">
 
-          <button
-            type="submit"
-            className="primary authButton"
-            disabled={loading}
-          >
-            {loading
-              ? 'Creating Account...'
-              : 'Register'}
-          </button>
+              <div className="authFeatureIcon">
+                <ArrowRight size={18} />
+              </div>
 
-        </form>
+              <div>
+                <b>Real-Time Awareness</b>
 
-        <p className="authSwitch">
-          Already have an account?
+                <span>
+                  Receive important landslide alerts
+                </span>
+              </div>
 
-          <button
-            type="button"
-            onClick={onLogin}
-          >
-            Login
-          </button>
-        </p>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="authFooter">
+
+          <span>
+            GiriDrishti AI
+          </span>
+
+          <span>
+            Intelligent Landslide Risk Monitoring
+          </span>
+
+        </div>
+
+      </div>
+
+      <div className="authFormSide">
+
+        <div className="authCard authRegisterCard">
+
+          <div className="authMobileBrand">
+
+            <div className="authLogo">
+              <Mountain size={27} />
+            </div>
+
+            <div>
+              <b>GiriDrishti AI</b>
+
+              <span>
+                Predict. Warn. Protect.
+              </span>
+            </div>
+
+          </div>
+
+          <div className="authHeading">
+
+            <div className="authIconCircle">
+              <User size={22} />
+            </div>
+
+            <div>
+
+              <h2>Create Account</h2>
+
+              <p>
+                Register for GiriDrishti monitoring
+              </p>
+
+            </div>
+
+          </div>
+
+          {error && (
+            <div className="authError">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+
+            <div className="authField">
+
+              <label>Full Name</label>
+
+              <div className="authInputWrap">
+
+                <User size={18} />
+
+                <input
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={e =>
+                    setName(e.target.value)
+                  }
+                  required
+                />
+
+              </div>
+
+            </div>
+
+            <div className="authField">
+
+              <label>Email Address</label>
+
+              <div className="authInputWrap">
+
+                <Mail size={18} />
+
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={e =>
+                    setEmail(e.target.value)
+                  }
+                  required
+                />
+
+              </div>
+
+            </div>
+
+            <div className="authField">
+
+              <label>Password</label>
+
+              <div className="authInputWrap">
+
+                <Lock size={18} />
+
+                <input
+                  type="password"
+                  placeholder="Minimum 6 characters"
+                  value={password}
+                  onChange={e =>
+                    setPassword(e.target.value)
+                  }
+                  required
+                />
+
+              </div>
+
+            </div>
+
+            <div className="authField">
+
+              <label>Confirm Password</label>
+
+              <div className="authInputWrap">
+
+                <Lock size={18} />
+
+                <input
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={e =>
+                    setConfirmPassword(
+                      e.target.value
+                    )
+                  }
+                  required
+                />
+
+              </div>
+
+            </div>
+
+            <button
+              type="submit"
+              className="primary authButton"
+              disabled={loading}
+            >
+              {loading
+                ? 'Creating Account...'
+                : 'Create Account'}
+            </button>
+
+          </form>
+
+          <div className="authDivider">
+            <span />
+            <small>EMAIL VERIFICATION</small>
+            <span />
+          </div>
+
+          <p className="authSwitch">
+
+            Already have an account?
+
+            <button
+              type="button"
+              onClick={onLogin}
+            >
+              Login
+            </button>
+
+          </p>
+
+          <div className="authSecurity">
+
+            <ShieldCheck size={16} />
+
+            <span>
+              Your account will be verified
+              using a one-time email OTP
+            </span>
+
+          </div>
+
+        </div>
 
       </div>
 
