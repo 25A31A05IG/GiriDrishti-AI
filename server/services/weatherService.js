@@ -1,24 +1,23 @@
 // services/weatherService.js
 
 const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
-
 const geocodeCache = new Map();
 
 /**
- * Reverse-geocodes coordinates into actual town, district, and state names
+ * High-accuracy reverse geocoding with English priority and fallbacks
  */
 async function fetchPlaceName(lat, lng) {
   const key = `${Number(lat).toFixed(3)},${Number(lng).toFixed(3)}`;
   if (geocodeCache.has(key)) return geocodeCache.get(key);
 
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=jsonv2&zoom=14`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=jsonv2&zoom=14&accept-language=en`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { "User-Agent": "GiriDrishtiAI/2.0 (DisasterManagement)" }
+      headers: { "User-Agent": "GiriDrishti-DisasterMonitor/3.0" }
     });
     clearTimeout(timer);
 
@@ -27,15 +26,14 @@ async function fetchPlaceName(lat, lng) {
       const addr = data.address || {};
 
       const areaName =
-        addr.village ||
         addr.suburb ||
+        addr.village ||
         addr.town ||
         addr.city ||
-        addr.municipality ||
         addr.county ||
-        addr.district ||
         addr.state_district ||
-        `Sector (${Number(lat).toFixed(2)}, ${Number(lng).toFixed(2)})`;
+        addr.district ||
+        `Locality (${Number(lat).toFixed(3)}, ${Number(lng).toFixed(3)})`;
 
       const state = addr.state || "Northeast India";
       const result = {
@@ -51,25 +49,45 @@ async function fetchPlaceName(lat, lng) {
   } catch (_) {}
 
   return {
-    areaName: `Sector (${Number(lat).toFixed(2)}, ${Number(lng).toFixed(2)})`,
+    areaName: `Locality (${Number(lat).toFixed(3)}, ${Number(lng).toFixed(3)})`,
     state: "Northeast India",
-    displayName: `Northeast India (${Number(lat).toFixed(2)}, ${Number(lng).toFixed(2)})`,
-    fullAddress: "Northeast India Region"
+    displayName: `Northeast India (${Number(lat).toFixed(3)}, ${Number(lng).toFixed(3)})`,
+    fullAddress: "Northeast India"
   };
 }
 
 /**
- * Fetches real-time, high-precision telemetry from Open-Meteo NWP models
+ * Fetches real, validated meteorological ground-truth from Open-Meteo
  */
 async function fetchAccurateWeather(lat, lng) {
+  const currentParams = [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "apparent_temperature",
+    "precipitation",
+    "rain",
+    "showers",
+    "weather_code",
+    "wind_speed_10m",
+    "surface_pressure"
+  ].join(",");
+
+  // Official Open-Meteo ECMWF/IFS soil moisture depths
+  const hourlyParams = [
+    "precipitation",
+    "rain",
+    "showers",
+    "soil_moisture_0_to_7cm",
+    "soil_moisture_7_to_28cm",
+    "soil_temperature_0_to_7cm"
+  ].join(",");
+
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}` +
-    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,surface_pressure` +
-    `&hourly=precipitation,rain,showers,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm,soil_temperature_0_to_7cm` +
-    `&past_days=1&forecast_days=1&timezone=auto`;
+    `&current=${currentParams}&hourly=${hourlyParams}&past_days=1&forecast_days=1&timezone=auto`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 7000);
 
   let response;
   try {
@@ -78,71 +96,57 @@ async function fetchAccurateWeather(lat, lng) {
     clearTimeout(timer);
   }
 
-  const nowIso = new Date().toISOString();
-
   if (!response.ok) {
-    throw new Error(`Open-Meteo returned status ${response.status}`);
+    throw new Error(`Open-Meteo returned HTTP ${response.status}`);
   }
 
   const data = await response.json();
   const current = data.current || {};
   const hourly = data.hourly || {};
 
-  // Exact matching between current observation time and hourly index
+  // Exact string comparison avoiding timezone parsing skew
+  const currentTimeStr = current.time || "";
   const times = Array.isArray(hourly.time) ? hourly.time : [];
-  let activeIndex = times.length - 1;
+  let activeIndex = times.indexOf(currentTimeStr);
 
-  if (current.time && times.length > 0) {
-    const targetMs = new Date(current.time).getTime();
-    let minDiff = Infinity;
-    for (let i = 0; i < times.length; i++) {
-      const diff = Math.abs(new Date(times[i]).getTime() - targetMs);
-      if (diff < minDiff) {
-        minDiff = diff;
-        activeIndex = i;
-      }
-    }
+  if (activeIndex === -1) {
+    activeIndex = times.length > 0 ? times.length - 1 : 0;
   }
 
-  // 24-hour antecedent rainfall calculation
-  const hourlyPrecip = Array.isArray(hourly.precipitation)
-    ? hourly.precipitation.map(Number).filter(Number.isFinite)
-    : [];
+  // 1. Calculate past 24-hour accumulated rainfall (vital for slope saturation)
+  const hourlyPrecip = Array.isArray(hourly.precipitation) ? hourly.precipitation.map(Number) : [];
+  const startIdx = Math.max(0, activeIndex - 24);
+  const past24hRain = hourlyPrecip.slice(startIdx, activeIndex + 1).reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0);
 
-  const pastPrecip = activeIndex > 0
-    ? hourlyPrecip.slice(Math.max(0, activeIndex - 24), activeIndex + 1)
-    : hourlyPrecip.slice(0, 24);
+  // 2. Real multi-layer soil volumetric fraction (m³/m³) to %
+  const sm0 = Number(hourly.soil_moisture_0_to_7cm?.[activeIndex]);
+  const sm1 = Number(hourly.soil_moisture_7_to_28cm?.[activeIndex]);
+  
+  let validSoilMoisture = 0;
+  if (Number.isFinite(sm0) && Number.isFinite(sm1)) {
+    validSoilMoisture = ((sm0 + sm1) / 2) * 100;
+  } else if (Number.isFinite(sm0)) {
+    validSoilMoisture = sm0 * 100;
+  } else {
+    validSoilMoisture = 28.0;
+  }
 
-  const accumulated24hRain = pastPrecip.reduce((acc, val) => acc + val, 0);
+  const soilMoisturePct = clamp(Number(validSoilMoisture.toFixed(2)), 0, 100);
 
-  // Parse volumetric soil moisture across shallow layers (0-1cm, 1-3cm, 3-9cm)
-  const layer0 = (hourly.soil_moisture_0_to_1cm || [])[activeIndex];
-  const layer1 = (hourly.soil_moisture_1_to_3cm || [])[activeIndex];
-  const layer2 = (hourly.soil_moisture_3_to_9cm || [])[activeIndex];
+  // 3. Current precipitation (combines convective showers + steady rain)
+  const rainRate = Number(current.precipitation ?? (Number(current.rain || 0) + Number(current.showers || 0)));
 
-  const validMoisture = [layer0, layer1, layer2].filter(Number.isFinite);
-  const avgMoistureFraction = validMoisture.length > 0
-    ? validMoisture.reduce((a, b) => a + b, 0) / validMoisture.length
-    : 0.28;
-
-  const soilMoisturePct = clamp(avgMoistureFraction * 100, 5, 95);
-
-  const totalPrecip = Number(
-    current.precipitation ??
-    ((current.rain ?? 0) + (current.showers ?? 0))
-  );
-
-  const observedIso = current.time ? new Date(current.time).toISOString() : nowIso;
+  const nowIso = new Date().toISOString();
+  const observedTime = current.time ? new Date(current.time).toISOString() : nowIso;
 
   return {
-    rainfall: Number(totalPrecip.toFixed(2)),
-    currentRain: Number((current.rain ?? 0).toFixed(2)),
-    showers: Number((current.showers ?? 0).toFixed(2)),
-    accumulated24hRain: Number(accumulated24hRain.toFixed(2)),
-    soilMoisture: Number(soilMoisturePct.toFixed(2)),
-    soilTemperature: activeIndex >= 0 && Array.isArray(hourly.soil_temperature_0_to_7cm)
-      ? Number(Number(hourly.soil_temperature_0_to_7cm[activeIndex] ?? 23.5).toFixed(1))
-      : 23.5,
+    rainfall: Number(rainRate.toFixed(2)),
+    currentRain: Number(Number(current.rain || 0).toFixed(2)),
+    accumulated24hRain: Number(past24hRain.toFixed(2)),
+    soilMoisture: soilMoisturePct,
+    soilTemperature: Number.isFinite(Number(hourly.soil_temperature_0_to_7cm?.[activeIndex]))
+      ? Number(Number(hourly.soil_temperature_0_to_7cm[activeIndex]).toFixed(1))
+      : 22.0,
     temperature: Number.isFinite(Number(current.temperature_2m))
       ? Number(Number(current.temperature_2m).toFixed(1))
       : 24.0,
@@ -151,7 +155,7 @@ async function fetchAccurateWeather(lat, lng) {
       : null,
     humidity: Number.isFinite(Number(current.relative_humidity_2m))
       ? Math.round(Number(current.relative_humidity_2m))
-      : 65,
+      : 60,
     windSpeed: Number.isFinite(Number(current.wind_speed_10m))
       ? Number(Number(current.wind_speed_10m).toFixed(1))
       : 0.0,
@@ -160,11 +164,11 @@ async function fetchAccurateWeather(lat, lng) {
       : null,
     weatherCode: Number(current.weather_code || 0),
     weatherSource: "Open-Meteo High-Resolution API",
-    observed: observedIso,
-    weatherObservedAt: observedIso,
+    observed: observedTime,
+    weatherObservedAt: observedTime,
     retrieved: nowIso,
     weatherRetrievedAt: nowIso,
-    weatherUpdatedAt: observedIso,
+    weatherUpdatedAt: observedTime,
     weatherCheckedAt: nowIso,
     weatherFresh: true,
     dataStatus: "LIVE"
