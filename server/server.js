@@ -1,3 +1,5 @@
+// server.js
+
 require('dotenv').config();
 
 const express = require('express');
@@ -28,13 +30,17 @@ app.use('/api/auth', authRoutes);
 /* Locations Router */
 app.use('/api/locations', locationsRoutes);
 
-/* Map Click Route (/api/location-report?lat=...&lng=...) */
+/* Exact Map Click Direct Endpoint: /api/location-report?lat=...&lng=... */
 app.get('/api/location-report', async (req, res) => {
-  const lat = Number(req.query.lat) || 26.55;
-  const lng = Number(req.query.lng) || 92.50;
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return res.status(400).json({ error: "Valid latitude and longitude query parameters are required" });
+  }
 
   try {
-    const report = await locationsRoutes.generateUnifiedLocationReport(lat, lng);
+    const report = await locationsRoutes.buildLocationReport(lat, lng);
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });
